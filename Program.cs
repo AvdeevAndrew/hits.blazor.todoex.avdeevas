@@ -1,72 +1,37 @@
-using hits.blazor.todoex.avdeevas.Components;
-using hits.blazor.todoex.avdeevas.Components.Account;
-using hits.blazor.todoex.avdeevas.Data;
-using Microsoft.AspNetCore.Components.Authorization;
-using Microsoft.AspNetCore.Identity;
+
+using AcademicJournal.Data;
+using hits.blazor.todoex.avdeevas.Components; // Попробуйте это, если App лежит в папке Components
 using Microsoft.EntityFrameworkCore;
 
-namespace hits.blazor.todoex.avdeevas
+var builder = WebApplication.CreateBuilder(args);
+
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+builder.Services.AddDbContext<JournalDbContext>(options =>
+    options.UseSqlServer(connectionString));
+
+builder.Services.AddRazorComponents()
+    .AddInteractiveServerComponents();
+
+// 1. Добавляем сервисы для Razor компонентов и интерактивности
+builder.Services.AddRazorComponents()
+    .AddInteractiveServerComponents(); // !!! ВАЖНО: Включает интерактивность !!!
+
+// 2. Регистрируем наш сервис журнала
+builder.Services.AddScoped<JournalService>();
+
+var app = builder.Build();
+
+if (!app.Environment.IsDevelopment())
 {
-    public class Program
-    {
-        public static void Main(string[] args)
-        {
-            var builder = WebApplication.CreateBuilder(args);
-
-            // Add services to the container.
-            builder.Services.AddRazorComponents()
-                .AddInteractiveServerComponents();
-
-            builder.Services.AddCascadingAuthenticationState();
-            builder.Services.AddScoped<IdentityUserAccessor>();
-            builder.Services.AddScoped<IdentityRedirectManager>();
-            builder.Services.AddScoped<AuthenticationStateProvider, IdentityRevalidatingAuthenticationStateProvider>();
-
-            builder.Services.AddAuthentication(options =>
-                {
-                    options.DefaultScheme = IdentityConstants.ApplicationScheme;
-                    options.DefaultSignInScheme = IdentityConstants.ExternalScheme;
-                })
-                .AddIdentityCookies();
-
-            var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
-            builder.Services.AddDbContext<ApplicationDbContext>(options =>
-                options.UseSqlServer(connectionString));
-            builder.Services.AddDatabaseDeveloperPageExceptionFilter();
-
-            builder.Services.AddIdentityCore<ApplicationUser>(options => options.SignIn.RequireConfirmedAccount = true)
-                .AddEntityFrameworkStores<ApplicationDbContext>()
-                .AddSignInManager()
-                .AddDefaultTokenProviders();
-
-            builder.Services.AddSingleton<IEmailSender<ApplicationUser>, IdentityNoOpEmailSender>();
-
-            var app = builder.Build();
-
-            // Configure the HTTP request pipeline.
-            if (app.Environment.IsDevelopment())
-            {
-                app.UseMigrationsEndPoint();
-            }
-            else
-            {
-                app.UseExceptionHandler("/Error");
-                // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
-                app.UseHsts();
-            }
-
-            app.UseHttpsRedirection();
-
-            app.UseStaticFiles();
-            app.UseAntiforgery();
-
-            app.MapRazorComponents<App>()
-                .AddInteractiveServerRenderMode();
-
-            // Add additional endpoints required by the Identity /Account Razor components.
-            app.MapAdditionalIdentityEndpoints();
-
-            app.Run();
-        }
-    }
+    app.UseExceptionHandler("/Error", createScopeForErrors: true);
+    app.UseHsts();
 }
+
+app.UseStaticFiles();
+app.UseAntiforgery();
+
+// 3. Настраиваем машрутизацию с интерактивным режимом
+app.MapRazorComponents<App>()
+    .AddInteractiveServerRenderMode(); // !!! ВАЖНО: Разрешает запуск интерактивности !!!
+
+app.Run();

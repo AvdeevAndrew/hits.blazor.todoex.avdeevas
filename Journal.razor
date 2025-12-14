@@ -1,0 +1,161 @@
+﻿@using Microsoft.AspNetCore.Components.Web
+
+@page "/journal"
+@rendermode RenderMode.InteractiveServer
+@using Microsoft.AspNetCore.Components.Forms
+@using AcademicJournal.Models
+@using AcademicJournal.Data
+@inject JournalService JournalService
+
+
+
+<PageTitle>Учебный журнал</PageTitle>
+
+<div class="container mt-4">
+    <h1>Учебный журнал</h1>
+    <p class="text-muted">Все данные хранятся в оперативной памяти.</p>
+
+    <div class="row">
+        <!-- ЛЕВАЯ КОЛОНКА: ФОРМА -->
+        <div class="col-md-4">
+            <div class="card p-3 shadow-sm bg-light">
+                <h4>Новая оценка</h4>
+                <EditForm Model="@newGrade" OnValidSubmit="HandleValidSubmit" FormName="AddGradeForm">
+                    <DataAnnotationsValidator />
+                    <ValidationSummary />
+
+                    <div class="mb-3">
+                        <label class="form-label">Студент</label>
+                        <InputSelect @bind-Value="newGrade.StudentId" class="form-select">
+                            <option value="0">-- Выберите --</option>
+                            @foreach (var s in students)
+                            {
+                                <option value="@s.Id">@s.Name</option>
+                            }
+                        </InputSelect>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Предмет</label>
+                        <InputSelect @bind-Value="newGrade.CourseId" class="form-select">
+                            <option value="0">-- Выберите --</option>
+                            @foreach (var c in courses)
+                            {
+                                <option value="@c.Id">@c.Title</option>
+                            }
+                        </InputSelect>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Оценка (1-5)</label>
+                        <InputNumber @bind-Value="newGrade.Score" class="form-control" />
+                    </div>
+
+                    <button type="submit" class="btn btn-success w-100">Сохранить</button>
+                </EditForm>
+            </div>
+        </div>
+
+        <!-- ПРАВАЯ КОЛОНКА: ТАБЛИЦА И ФИЛЬТРЫ -->
+        <div class="col-md-8">
+            <div class="row mb-3 g-2">
+                <div class="col">
+                    <input class="form-control" placeholder="🔍 Поиск по имени..." 
+                           @bind="FilterStudent" @bind:event="oninput" />
+                </div>
+                <div class="col">
+                    <input class="form-control" placeholder="🔍 Поиск по предмету..." 
+                           @bind="FilterCourse" @bind:event="oninput" />
+                </div>
+            </div>
+
+            <table class="table table-bordered table-hover">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Дата</th>
+                        <th>Студент</th>
+                        <th>Предмет</th>
+                        <th>Балл</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var g in FilteredGrades)
+                    {
+                        <tr>
+                            <td>@g.Date.ToString("dd.MM HH:mm")</td>
+                            <td>@g.Student?.Name</td>
+                            <td>@g.Course?.Title</td>
+                            <td style="font-weight:bold; color: @(g.Score < 3 ? "red" : "green")">
+                                @g.Score
+                            </td>
+                        </tr>
+                    }
+                    @if (!FilteredGrades.Any())
+                    {
+                        <tr><td colspan="4" class="text-center">Нет записей</td></tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+@code {
+    // Данные
+    private List<Student> students = new();
+    private List<Course> courses = new();
+    private List<Grade> allGrades = new();
+    
+    // Модель для формы
+    private Grade newGrade = new Grade { Score = 5 };
+
+    // Поля фильтрации
+    private string FilterStudent { get; set; } = "";
+    private string FilterCourse { get; set; } = "";
+
+    protected override void OnInitialized()
+    {
+        RefreshData();
+    }
+
+    private void RefreshData()
+    {
+        students = JournalService.GetStudents();
+        courses = JournalService.GetCourses();
+        allGrades = JournalService.GetAllGrades();
+    }
+
+    private void HandleValidSubmit()
+    {
+        // Простая валидация: если не выбран студент или курс
+        if (newGrade.StudentId == 0 || newGrade.CourseId == 0) return;
+
+        // 1. Сохраняем в память
+        JournalService.AddGrade(newGrade);
+
+        // 2. Очищаем форму
+        newGrade = new Grade { Score = 5 };
+
+        // 3. Обновляем таблицу
+        RefreshData();
+    }
+
+    // Логика фильтрации (работает "на лету")
+    private IEnumerable<Grade> FilteredGrades
+    {
+        get
+        {
+            var result = allGrades.AsEnumerable();
+
+            if (!string.IsNullOrWhiteSpace(FilterStudent))
+                result = result.Where(g => g.Student != null && 
+                                      g.Student.Name.Contains(FilterStudent, StringComparison.OrdinalIgnoreCase));
+
+            if (!string.IsNullOrWhiteSpace(FilterCourse))
+                result = result.Where(g => g.Course != null && 
+                                      g.Course.Title.Contains(FilterCourse, StringComparison.OrdinalIgnoreCase));
+
+            return result;
+        }
+    }
+}
